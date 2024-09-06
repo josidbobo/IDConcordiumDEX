@@ -5,5 +5,6 @@ This is a Decentralised Exchange on the Concordium Blockchain where users gain a
 
 ## How to set-up
 
-1. Clone the repository ##
+1. Clone the repository
+2. ##
        git clone https://github.com/josidbobo/IDConcordiumDEX
