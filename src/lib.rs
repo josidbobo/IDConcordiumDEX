@@ -29,9 +29,8 @@ enum DexEvent {
 }
 
 // Contract state
-//#[concordium(state_parameter = "S")]
-#[derive(Serial, DeserialWithState)]
-struct State<S = HasStateApi> {
+#[derive(Serial, Deserial)]
+pub struct State {
     token_price: ContractTokenPrice,
     token_balance: ContractTokenAmount,
 }
@@ -41,7 +40,9 @@ struct State<S = HasStateApi> {
 enum DexError {
     InsufficientCCD,
     InsufficientTokens,
+    InvalidTokenId,
     TokenTransferFailed,
+    Unauthorized,
 }
 
 // Init function
@@ -54,7 +55,6 @@ fn dex_init(ctx: &InitContext, state_builder: &mut StateBuilder) -> InitResult<S
     })
 }
 
-#[derive(Serial, DeserialWithState<ExternStateApi>)]
 // Buy tokens
 #[receive(
     contract = "techFiestaDex",
@@ -129,7 +129,7 @@ fn sell_tokens(
     // Transfer tokens from the seller to the DEX contract
     let transfer_params = TransferParams::from(vec![Transfer {
         from: ctx.sender(),
-        to: Receiver::Contract(ctx.self_address(), OwnedEntrypointName::new("receiveTokens".to_string())),
+        to: Receiver::Contract(ctx.self_address(), OwnedEntrypointName::from("receiveTokens".to_string().into())),
         token_id: TOKEN_ID,
         amount: tokens_to_sell,
         data: AdditionalData::empty(),
@@ -166,18 +166,19 @@ fn sell_tokens(
     contract = "techFiestaDex",
     name = "receiveTokens",
     parameter = "OnReceivingCis2Params<ContractTokenId, ContractTokenAmount>",
+    mutable
 )]
 fn receive_tokens(_ctx: &ReceiveContext, host: &mut Host<State>) -> ReceiveResult<()> {
     let params: OnReceivingCis2Params<ContractTokenId, ContractTokenAmount> = _ctx.parameter_cursor().get()?;
-    ensure!(params.token_id == TOKEN_ID, "Invalid token ID");
-    host.state_mut().token_balance += params.amount;
+    ensure!(params.token_id == TOKEN_ID, DexError::InvalidTokenId.into());
+    host.state_mut().token_balance += params.amount;    
     Ok(())
 }
 
 // View function
 #[receive(contract = "techFiestaDex", name = "view", return_value = "State")]
 fn contract_view(_ctx: &ReceiveContext, host: &Host<State>) -> ReceiveResult<State> {
-    Ok(host.state().clone())
+    Ok(host.state())
 }
 
 // Update token price (only by contract owner)
@@ -188,7 +189,7 @@ fn contract_view(_ctx: &ReceiveContext, host: &Host<State>) -> ReceiveResult<Sta
     mutable
 )]
 fn update_price(ctx: &ReceiveContext, host: &mut Host<State>) -> ReceiveResult<()> {
-    ensure!(ctx.sender().matches_account(&ctx.owner()), "Unauthorized");
+    ensure!(ctx.sender().matches_account(&ctx.owner()), DexError::Unauthorized.into());
     let new_price: ContractTokenPrice = ctx.parameter_cursor().get()?;
     host.state_mut().token_price = new_price;
     Ok(())
