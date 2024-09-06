@@ -5,6 +5,29 @@ This is a Decentralised Exchange on the Concordium Blockchain where users gain a
 
 ## How to set-up
 
+### Concordium-contracts
+
 1. Clone the repository
-2. ##
+ ##
        git clone https://github.com/josidbobo/IDConcordiumDEX
+2. Install dependencies for the contracts
+ ##
+       cargo install 
+3. Build the wasm module
+    ##
+       cargo concordium build --out ./concordium-out/module.wasm.v1 --schema-embed
+
+### Frontend
+
+1. Open the Frontend folder
+ ##
+       cd frontend
+2. Install dependencies
+ ##
+       npm install
+3. Start the server
+ ##
+       npm start
+
+
+
