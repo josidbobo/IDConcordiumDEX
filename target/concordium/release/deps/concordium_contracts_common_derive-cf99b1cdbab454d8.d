@@ -1,0 +1,7 @@
+C:\Users\OKORO-JOSHUA\Desktop\Applications\Dapps\IDConcordiumDEX\target/concordium\release\deps\concordium_contracts_common_derive-cf99b1cdbab454d8.dll: C:\Users\OKORO-JOSHUA\.cargo\registry\src\index.crates.io-6f17d22bba15001f\concordium-contracts-common-derive-4.1.0\src\lib.rs C:\Users\OKORO-JOSHUA\.cargo\registry\src\index.crates.io-6f17d22bba15001f\concordium-contracts-common-derive-4.1.0\src\attribute.rs C:\Users\OKORO-JOSHUA\.cargo\registry\src\index.crates.io-6f17d22bba15001f\concordium-contracts-common-derive-4.1.0\src\derive.rs
+
+C:\Users\OKORO-JOSHUA\Desktop\Applications\Dapps\IDConcordiumDEX\target/concordium\release\deps\concordium_contracts_common_derive-cf99b1cdbab454d8.d: C:\Users\OKORO-JOSHUA\.cargo\registry\src\index.crates.io-6f17d22bba15001f\concordium-contracts-common-derive-4.1.0\src\lib.rs C:\Users\OKORO-JOSHUA\.cargo\registry\src\index.crates.io-6f17d22bba15001f\concordium-contracts-common-derive-4.1.0\src\attribute.rs C:\Users\OKORO-JOSHUA\.cargo\registry\src\index.crates.io-6f17d22bba15001f\concordium-contracts-common-derive-4.1.0\src\derive.rs
+
+C:\Users\OKORO-JOSHUA\.cargo\registry\src\index.crates.io-6f17d22bba15001f\concordium-contracts-common-derive-4.1.0\src\lib.rs:
+C:\Users\OKORO-JOSHUA\.cargo\registry\src\index.crates.io-6f17d22bba15001f\concordium-contracts-common-derive-4.1.0\src\attribute.rs:
+C:\Users\OKORO-JOSHUA\.cargo\registry\src\index.crates.io-6f17d22bba15001f\concordium-contracts-common-derive-4.1.0\src\derive.rs:
