@@ -8,13 +8,17 @@ This is a Decentralised Exchange on the Concordium Blockchain where users gain a
 
 ### Concordium-contracts
 
-1. Clone the repository
+1. First, install `cargo-concordium`
+  
+       cargo install cargo-concordium@3.0.0
+   
+3. Clone the repository
  ##
        git clone https://github.com/josidbobo/IDConcordiumDEX
-2. Install dependencies for the contracts
+3. Install dependencies for the contracts
  ##
        cargo install 
-3. Build the wasm module
+4. Build the wasm module
     ##
        cargo concordium build --out ./concordium-out/module.wasm.v1 --schema-embed
 
