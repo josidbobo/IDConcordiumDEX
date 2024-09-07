@@ -5,7 +5,7 @@ This is a Decentralised Exchange on the Concordium Blockchain where users gain a
 
 ### Concordium-contracts
 
-1. First, install `cargo-concordium`
+1. First, make sure you have `Rust` installed, then install `cargo-concordium`
   
        cargo install cargo-concordium@3.0.0
    
