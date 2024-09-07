@@ -27,8 +27,8 @@ This is a Decentralised Exchange on the Concordium Blockchain where users gain a
 2. Install dependencies
  
        npm install
-3. Start the server
- ##
+3. To test, Start the server
+ 
        npm start
 
 
