@@ -89,15 +89,11 @@ fn add<S: HasStateApi>(
         params.quantity,
     )?;
 
-    ensure!(
-        host.state().commission.percentage_basis + params.royalty <= MAX_BASIS_POINTS,
-        DexError::InvalidRoyalty
-    );
+    
     host.state_mut().list_token(
         &token_info,
         &sender_account_address,
         params.price,
-        params.royalty,
         params.quantity,
     );
 
@@ -110,7 +106,7 @@ fn add<S: HasStateApi>(
 /// account can transfer an Asset by paying a price. The transfer will fail of
 /// the Amount paid is < token_quantity * token_price
 #[receive(
-    contract = "Market-NFT",
+    contract = "RagnarDEX",
     name = "transfer",
     parameter = "TransferParams",
     mutable,
@@ -133,12 +129,11 @@ fn transfer<S: HasStateApi>(
 
     let listed_token = host
         .state()
-        .get_listed(&token_info, &params.owner)
+        .get_token(&token_info, &params.owner)
         .ok_or(DexError::TokenNotListed)?;
 
-    let listed_quantity = listed_token.1.quantity;
-    let price_per_unit = listed_token.1.price;
-    let token_royalty_state = listed_token.0;
+    let listed_quantity = listed_token.quantity;
+    let price_per_unit = listed_token.price;
 
     ensure!(
         listed_quantity.cmp(&params.quantity).is_ge(),
@@ -173,7 +168,7 @@ fn transfer<S: HasStateApi>(
         Transfer {
             amount: params.quantity,
             from: Address::Account(params.owner),
-            to: Receiver::Account(params.to),
+            to: Receiver::Account(params.to),   // User that bought the cis2 token
             token_id: params.token_id,
             data: AdditionalData::empty(),
         },
@@ -188,7 +183,6 @@ fn transfer<S: HasStateApi>(
         host,
         amount,
         &params.owner,
-        &token_royalty_state,
         &ctx.owner(),
     )?;
 
@@ -199,8 +193,8 @@ fn transfer<S: HasStateApi>(
     Ok(())
 }
 
-/// Returns a list of Added Tokens with Metadata which contains the token price
-#[receive(contract = "Market-NFT", name = "list", return_value = "TokenList")]
+/// Returns a list of Added Cis2 Tokens and the token price
+#[receive(contract = "RagnarDEX", name = "list", return_value = "TokenList")]
 fn list<S: HasStateApi>(
     _ctx: &impl HasReceiveContext,
     host: &impl HasHost<ContractState<S>, StateApiType = S>,
@@ -218,9 +212,7 @@ fn list<S: HasStateApi>(
 
 struct DistributableAmounts {
     to_primary_owner: Amount,
-    to_seller: Amount,
-    to_marketplace: Amount,
-}
+    }
 
 /// Calls the [supports](https://proposals.concordium.software/CIS/cis-0.html#supports) function of CIS2 contract.
 /// Returns error If the contract does not support the standard.
@@ -286,21 +278,18 @@ fn ensure_balance<S: HasStateApi, T: IsTokenId + Copy, A: IsTokenAmount + Ord + 
     Ok(())
 }
 
-// Distributes Selling Price, Royalty & Commission amounts.
+// Distribute the funds to appropriate address.
 fn distribute_amounts<S: HasStateApi, T: IsTokenId + Copy, A: IsTokenAmount + Copy, E>(
     host: &mut impl HasHost<State<S, T, A>, StateApiType = S, ReturnValueType = E>,
     amount: Amount,
     token_owner: &AccountAddress,
-    token_royalty_state: &TokenRoyaltyState,
     marketplace_owner: &AccountAddress,
 ) -> Result<(), DexError> {
     let amounts = calculate_amounts(
         &amount,
-        &host.state().commission,
-        token_royalty_state.royalty,
     );
 
-    host.invoke_transfer(token_owner, amounts.to_seller)
+    host.invoke_transfer(token_owner, amounts)
         .map_err(|_| DexError::InvokeTransferError)?;
 
     if amounts
@@ -317,9 +306,7 @@ fn distribute_amounts<S: HasStateApi, T: IsTokenId + Copy, A: IsTokenAmount + Co
         .cmp(&Amount::from_micro_ccd(0))
         .is_gt()
     {
-        host.invoke_transfer(&token_royalty_state.primary_owner, amounts.to_primary_owner)
-            .map_err(|_| DexError::InvokeTransferError)?;
-    };
+         };
 
     Ok(())
 }
@@ -328,22 +315,11 @@ fn distribute_amounts<S: HasStateApi, T: IsTokenId + Copy, A: IsTokenAmount + Co
 /// distributed
 fn calculate_amounts(
     amount: &Amount,
-    commission: &Commission,
-    royalty_percentage_basis: u16,
 ) -> DistributableAmounts {
-    let commission_amount =
-        (*amount * commission.percentage_basis.into()).quotient_remainder(MAX_BASIS_POINTS.into());
-
-    let royalty_amount =
-        (*amount * royalty_percentage_basis.into()).quotient_remainder(MAX_BASIS_POINTS.into());
 
     DistributableAmounts {
         to_seller: amount
-            .subtract_micro_ccd(commission_amount.0.micro_ccd())
-            .subtract_micro_ccd(royalty_amount.0.micro_ccd()),
-        to_marketplace: commission_amount.0,
-        to_primary_owner: royalty_amount.0,
-    }
+        }
 }
 
 #[concordium_cfg_test]

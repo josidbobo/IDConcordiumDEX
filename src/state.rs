@@ -64,7 +64,6 @@ impl<S: HasStateApi, T: IsTokenId + Copy, A: IsTokenAmount + Copy + ops::Sub<Out
         token_info: &TokenInfo<T>,
         owner: &AccountAddress,
         price: Amount,
-        royalty: u16,
         quantity: A,
     ) {
         match self.token_prices.get(&TokenOwnerInfo::from(token_info.clone(), owner)) {
