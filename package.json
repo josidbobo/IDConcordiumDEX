@@ -1,6 +1,8 @@
 {
   "dependencies": {
     "@concordium/browser-wallet-api-helpers": "^3.0.1",
-    "react-router-dom": "^6.26.2"
+   
+  },
+  "devDependencies": {
   }
 }
