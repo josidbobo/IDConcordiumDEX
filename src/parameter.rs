@@ -46,8 +46,5 @@ pub struct TokenList(
 /// Parameters for the `init` method for Market Contract.
 #[derive(Serial, Deserial, SchemaType)]
 pub struct InitParams {
-    /// Commission basis points. equals to percent * 100
-    /// This can me atmost equal to 100*100 = 10000(MAX_BASIS_POINTS)
-    /// This is the commission charged by the marketplace on every sale.
     pub amount: u16,
 }

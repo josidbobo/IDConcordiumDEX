@@ -58,7 +58,7 @@ export default function Footer() {
           </a>
         </div>
       </div>
-      <p className="mt-4 text-sm">© 2024 Made with Love for Concordium Ecosystem</p>
+      <p className="mt-4 text-sm">© 2024 Made with Love for The Concordium Ecosystem</p>
     </footer>
   );
 }

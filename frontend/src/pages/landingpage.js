@@ -86,8 +86,10 @@ async function connect() {
     <div className="min-h-screen bg-gray-900 text-white">
       <header className="p-4 flex justify-between items-center">
         <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 bg-red-600 rounded-sm"></div>
-          <span className="text-xl font-bold">LARRY <span className="text-white">MOSH</span></span>
+          <div className="w-8 h-8 rounded-sm">
+          <img src="/concordium-logo.png" alt="DeFi Illustration" className="bg-red-500"/>
+          </div>
+          <span className="text-xl font-bold">RAGNAR <span className="text-white">DEX</span></span>
         </div>
         <button onClick={connect} className="bg-red-600 text-white px-4 py-2 rounded">Connect Wallet</button>
       </header>

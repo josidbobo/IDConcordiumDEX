@@ -102,7 +102,7 @@ fn add<S: HasStateApi>(
 
 /// Allows for transferring the token specified by TransferParams.
 ///
-/// This function is the typical buy function of a Marketplace where one
+/// This function is the buy function where one
 /// account can transfer an Asset by paying a price. The transfer will fail of
 /// the Amount paid is < token_quantity * token_price
 #[receive(
@@ -167,7 +167,7 @@ fn transfer<S: HasStateApi>(
         host,
         Transfer {
             amount: params.quantity,
-            from: Address::Account(params.owner),
+            from: Address::Contract(ctx.self_address()),
             to: Receiver::Account(params.to),   // User that bought the cis2 token
             token_id: params.token_id,
             data: AdditionalData::empty(),
@@ -179,12 +179,12 @@ fn transfer<S: HasStateApi>(
         Err(_) => bail!(DexError::Cis2ClientError),
     };
 
-    distribute_amounts(
-        host,
-        amount,
-        &params.owner,
-        &ctx.owner(),
-    )?;
+    // distribute_amounts(
+    //     host,
+    //     amount,
+    //     &params.owner,
+    //     &ctx.owner(),
+    // )?;
 
     host.state_mut().decrease_listed_quantity(
         &TokenOwnerInfo::from(token_info, &params.owner),
@@ -209,10 +209,6 @@ fn list<S: HasStateApi>(
 
     Ok(TokenList(tokens))
 }
-
-struct DistributableAmounts {
-    to_primary_owner: Amount,
-    }
 
 /// Calls the [supports](https://proposals.concordium.software/CIS/cis-0.html#supports) function of CIS2 contract.
 /// Returns error If the contract does not support the standard.
@@ -278,9 +274,15 @@ fn ensure_balance<S: HasStateApi, T: IsTokenId + Copy, A: IsTokenAmount + Ord + 
     Ok(())
 }
 
-// Distribute the funds to appropriate address.
+
+struct DistributableAmounts {
+    to_primary_owner: Amount,
+    }
+
+// Distribute the funds to appropriate addresses if needed.
 fn distribute_amounts<S: HasStateApi, T: IsTokenId + Copy, A: IsTokenAmount + Copy, E>(
     host: &mut impl HasHost<State<S, T, A>, StateApiType = S, ReturnValueType = E>,
+    ctx: &ReceiveContext,
     amount: Amount,
     token_owner: &AccountAddress,
     marketplace_owner: &AccountAddress,
@@ -289,15 +291,15 @@ fn distribute_amounts<S: HasStateApi, T: IsTokenId + Copy, A: IsTokenAmount + Co
         &amount,
     );
 
-    host.invoke_transfer(token_owner, amounts)
+    host.invoke_transfer(marketplace_owner, amount)
         .map_err(|_| DexError::InvokeTransferError)?;
 
     if amounts
-        .to_marketplace
+        .to_primary_owner
         .cmp(&Amount::from_micro_ccd(0))
         .is_gt()
     {
-        host.invoke_transfer(marketplace_owner, amounts.to_marketplace)
+        host.invoke_transfer(marketplace_owner, amounts.to_primary_owner)
             .map_err(|_| DexError::InvokeTransferError)?;
     }
 
@@ -318,7 +320,7 @@ fn calculate_amounts(
 ) -> DistributableAmounts {
 
     DistributableAmounts {
-        to_seller: amount
+        to_primary_owner: amount.to_owned()
         }
 }
 
@@ -326,8 +328,8 @@ fn calculate_amounts(
 mod test {
     use crate::{
         add, calculate_amounts, list,
-        params::AddParams,
-        state::{Commission, State, TokenInfo, TokenListItem, TokenPriceState, TokenRoyaltyState},
+        parameter::AddParams,
+        state::{ State, TokenInfo, TokenListItem, TokenPriceState,},
         ContractState, ContractTokenAmount, ContractTokenId,
     };
     use concordium_cis2::*;
