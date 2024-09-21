@@ -1,8 +1,0 @@
-{
-  "dependencies": {
-    "@concordium/browser-wallet-api-helpers": "^3.0.1",
-   
-  },
-  "devDependencies": {
-  }
-}

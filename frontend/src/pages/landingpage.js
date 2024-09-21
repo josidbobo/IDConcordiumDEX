@@ -4,7 +4,7 @@ import { ConcordiumGRPCClient, ContractAddress, getPastDate, MIN_DATE, Web3State
 //import { Link, NavLink } from "react-router-dom";
 import { CONCORDIUM_NODE_PORT, CONNCORDIUM_NODE_ENDPOINT } from "../components/constants";
 import { detectConcordiumProvider, WalletApi } from '@concordium/browser-wallet-api-helpers';
- 
+import Footer from './footer';
 import { useNavigate } from 'react-router-dom';  
 
 const DeFiLandingPage = () => {
@@ -16,7 +16,7 @@ const DeFiLandingPage = () => {
 
   useEffect(() => {  
     // Add your condition here for navigating  
-    if(isVerified == true){
+    if(isVerified === true){
     navigate('/exchange');  
     }
   }, [isVerified]); // Dependency array to prevent infinite loops  
@@ -29,7 +29,7 @@ const DeFiLandingPage = () => {
 async function connect() {
     await detectConcordiumProvider()
         .then((provider) => {
-            provider.getMostRecentlySelectedAccount()
+            provider.requestAccounts()
                 .then((account) => (account ? Promise.resolve(account) : provider.connect()))
                 .then(async (account) => {
                     await verifyUser();
@@ -97,15 +97,15 @@ async function connect() {
           <h1 className="text-4xl md:text-5xl font-bold mb-4">
             Decentralized
             <br />
-            <span className="text-red-600">Lending</span> And <span className="text-red-600">Borrowing</span>
+            <span className="text-red-600">Exchange</span> on <span className="text-red-600">Concordium</span>
           </h1>
           <p className="text-gray-400 mb-8">
-            The core purpose of this project is to showcase my adept understanding of
-            lending and borrowing strategies in the context of blockchain technology.
-          </p>
-          <button className="bg-red-600 text-white px-6 py-3 rounded-full flex items-center">
-            Go to Dashboard <ArrowRight className="ml-2" />
+            This project aims to showcase a proof-of-concept on Decentralised Exchange service on the Concordium Blockchain
+            it's also to refine my understanding of DEX strategies using CIS2 tokens in the context of blockchain technology.          </p>
+          <button onClick={connect} className="bg-red-600 text-white px-6 py-3 rounded-full flex items-center">
+            Connect & verify <ArrowRight className="ml-2" />
           </button>
+          
         </div>
 
         <div className="md:w-1/2 mt-8 md:mt-0">
@@ -123,7 +123,11 @@ async function connect() {
         <button className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center">
           <TrendingUp size={20} />
         </button>
+        
       </div>
+      
+          <Footer/>
+        
     </div>
   );
 };
