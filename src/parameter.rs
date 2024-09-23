@@ -11,7 +11,6 @@ pub(crate) struct AddParams {
     pub token_id: ContractTokenId,
 
     /// Price per Unit of Token at this the Token is to be sold.
-    /// This includes Selling Price + Marketplace Commission
     pub price: Amount,
 
     /// Quantity of the token which can be listed on the marketplace

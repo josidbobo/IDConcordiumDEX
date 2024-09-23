@@ -11,6 +11,7 @@ pub enum DexError {
     Cis2ClientError,
     CollectionNotCis2,
     InvalidAmountPaid,
+    InsufficientFunds,
     InvokeTransferError,
     NoBalance,
     NotOperator,

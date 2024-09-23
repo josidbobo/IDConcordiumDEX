@@ -31,11 +31,9 @@ type ContractTokenAmount = TokenAmountU64;
 type ContractState<S> = State<S, ContractTokenId, ContractTokenAmount>;
 type Cis2ClientResult<T> = Result<T, concordium_cis2::Cis2ClientError<()>>;
 
-/// Initializes a new Marketplace Contract
+/// Initializes a new Exchange Contract
 ///
 /// This function can be called by using InitParams.
-/// The commission should be less than the maximum allowed value of 10000 basis
-/// points
 #[init(contract = "RagnarDEX", parameter = "InitParams")]
 fn init<S: HasStateApi>(
     ctx: &impl HasInitContext,
@@ -127,8 +125,8 @@ fn transfer<S: HasStateApi>(
         address: params.cis_contract_address,
     };
 
-    let listed_token = host
-        .state()
+    let mut listed_token = host
+        .state_mut()
         .get_token(&token_info, &params.owner)
         .ok_or(DexError::TokenNotListed)?;
 
@@ -179,6 +177,105 @@ fn transfer<S: HasStateApi>(
         Err(_) => bail!(DexError::Cis2ClientError),
     };
 
+    listed_token.price = listed_token.price + Amount::from_micro_ccd(1);
+
+   
+    Ok(())
+}
+
+#[receive(
+    contract = "RagnarDEX",
+    name = "receive_ccd",
+    parameter = "TransferParams",
+    payable,
+    mutable
+)]
+fn receive_ccd<S: HasStateApi>( _ctx: &impl HasReceiveContext,
+    _host: &mut impl HasHost<ContractState<S>, StateApiType = S>,
+    _amount: Amount) -> ContractResult<()>{
+    Ok(())
+}
+/// Allows for transferring selling the Cis2 token specified from the user of the Dex for CCD 
+///
+/// This function is the function where one
+/// account can transfer an Asset by paying a price. The transfer will fail of
+/// the Amount paid is < token_quantity * token_price
+#[receive(
+    contract = "RagnarDEX",
+    name = "transfer_cis2",
+    parameter = "TransferParams",
+    mutable,
+)]
+fn transfer_cis2<S: HasStateApi>(
+    ctx: &impl HasReceiveContext,
+    host: &mut impl HasHost<ContractState<S>, StateApiType = S>,
+) -> ContractResult<()> {
+    let params: TransferParams = ctx
+        .parameter_cursor()
+        .get()
+        .map_err(|_e| DexError::ParseParams)?;
+
+    let token_info = TokenInfo {
+        id: params.token_id,
+        address: params.cis_contract_address,
+    };
+
+    let mut listed_token = host
+        .state_mut()
+        .get_token(&token_info, &params.owner)
+        .ok_or(DexError::TokenNotListed)?;
+
+    let listed_quantity = listed_token.quantity;
+    let price_per_unit = listed_token.price;
+
+    ensure!(
+        listed_quantity.cmp(&params.quantity).is_ge(),
+        DexError::InvalidTokenQuantity
+    );
+
+    let price = price_per_unit * params.quantity.0;
+    ensure!(
+        host.self_balance().cmp(&price).is_ge(),
+        DexError::InsufficientFunds
+    );
+
+    let cis2_client = Cis2Client::new(params.cis_contract_address);
+    let res: Cis2ClientResult<SupportResult> = cis2_client.supports_cis2(host);
+    let res = match res {
+        Ok(res) => res,
+        Err(_) => bail!(DexError::Cis2ClientError),
+    };
+    // Checks if the CIS2 contract supports the CIS2 interface.
+    let cis2_contract_address = match res {
+        SupportResult::NoSupport => bail!(DexError::CollectionNotCis2),
+        SupportResult::Support => params.cis_contract_address,
+        SupportResult::SupportBy(contracts) => match contracts.first() {
+            Some(c) => *c,
+            None => bail!(DexError::CollectionNotCis2),
+        },
+    };
+
+    let cis2_client = Cis2Client::new(cis2_contract_address);
+    let res: Cis2ClientResult<bool> = cis2_client.transfer(
+        host,
+        Transfer {
+            amount: params.quantity,
+            from: Address::Account(params.owner),
+            to: Receiver::Contract(ctx.self_address(), OwnedEntrypointName::new("receive_ccd".to_string()).unwrap(),
+        ),   // User that receives the cis2 token
+            token_id: params.token_id,
+            data: AdditionalData::empty(),
+        },
+    );
+
+    match res {
+        Ok(res) => res,
+        Err(_) => bail!(DexError::Cis2ClientError),
+    };
+
+    host.invoke_transfer(&params.owner, price)
+        .map_err(|_| DexError::InvokeTransferError)?;
+
     // distribute_amounts(
     //     host,
     //     amount,
@@ -186,10 +283,7 @@ fn transfer<S: HasStateApi>(
     //     &ctx.owner(),
     // )?;
 
-    host.state_mut().decrease_listed_quantity(
-        &TokenOwnerInfo::from(token_info, &params.owner),
-        params.quantity,
-    );
+    listed_token.price = listed_token.price - Amount::from_micro_ccd(1);
     Ok(())
 }
 
@@ -311,6 +405,7 @@ fn distribute_amounts<S: HasStateApi, T: IsTokenId + Copy, A: IsTokenAmount + Co
          };
 
     Ok(())
+    
 }
 
 /// Calculates the amounts (Commission, Royalty & Selling Price) to be
@@ -322,6 +417,19 @@ fn calculate_amounts(
     DistributableAmounts {
         to_primary_owner: amount.to_owned()
         }
+        
+          // distribute_amounts(
+    //     host,
+    //     amount,
+    //     &params.owner,
+    //     &ctx.owner(),
+    // )?;
+
+    // host.state_mut().decrease_listed_quantity(
+    //     &TokenOwnerInfo::from(token_info, &params.owner),
+    //     params.quantity,
+    // );
+
 }
 
 #[concordium_cfg_test]
@@ -361,14 +469,13 @@ mod test {
             cis_contract_address: CIS_CONTRACT_ADDRESS,
             price,
             token_id: token_id_1,
-            royalty: 0,
             quantity: token_quantity_1,
         };
         let parameter_bytes = to_bytes(&add_params);
         ctx.set_parameter(&parameter_bytes);
 
         let mut state_builder = TestStateBuilder::new();
-        let state = State::new(&mut state_builder, 250);
+        let state = State::new(&mut state_builder);
         let mut host = TestHost::new(state, state_builder);
 
         fn mock_supports(
@@ -436,20 +543,11 @@ mod test {
             host.state().token_prices.iter().count() != 0,
             "Token not added"
         );
-        claim!(
-            host.state().token_royalties.iter().count() != 0,
-            "Token not added"
-        );
-        claim_eq!(
-            host.state().commission,
-            Commission {
-                percentage_basis: 250,
-            }
-        );
+        
+        
 
         let token_list_tuple = host
-            .state()
-            .get_listed(
+            .state().add(
                 &TokenInfo {
                     id: token_id_1,
                     address: CIS_CONTRACT_ADDRESS,
@@ -458,125 +556,13 @@ mod test {
             )
             .expect("Should not be None");
 
-        claim_eq!(
-            token_list_tuple.0.to_owned(),
-            TokenRoyaltyState {
-                primary_owner: ACCOUNT_0,
-                royalty: 0,
-            }
-        );
+        
         claim_eq!(
             token_list_tuple.1.to_owned(),
             TokenPriceState {
                 price,
                 quantity: token_quantity_1
             },
-        )
-    }
-
-    #[concordium_test]
-    fn should_list_token() {
-        let token_quantity_1 = ContractTokenAmount::from(1);
-        let token_id_1 = ContractTokenId::from(1);
-        let token_id_2 = ContractTokenId::from(2);
-        let token_price_1 = Amount::from_ccd(1);
-        let token_price_2 = Amount::from_ccd(2);
-
-        let mut ctx = TestReceiveContext::default();
-        ctx.set_sender(ADDRESS_0);
-        ctx.set_self_address(MARKET_CONTRACT_ADDRESS);
-
-        let mut state_builder = TestStateBuilder::new();
-        let mut state = State::new(&mut state_builder, 250);
-        state.list_token(
-            &TokenInfo {
-                id: token_id_1,
-                address: CIS_CONTRACT_ADDRESS,
-            },
-            &ACCOUNT_0,
-            token_price_1,
-            0,
-            token_quantity_1,
-        );
-        state.list_token(
-            &TokenInfo {
-                id: token_id_2,
-                address: CIS_CONTRACT_ADDRESS,
-            },
-            &ACCOUNT_0,
-            token_price_2,
-            0,
-            token_quantity_1,
-        );
-        let host = TestHost::new(state, state_builder);
-        let list_result = list(&ctx, &host);
-
-        claim!(list_result.is_ok());
-        let token_list = list_result.unwrap();
-        let list = token_list.0;
-        claim_eq!(list.len(), 2);
-
-        let first_token = list.first().unwrap();
-        let second_token = list.last().unwrap();
-
-        claim_eq!(
-            first_token,
-            &TokenListItem {
-                token_id: token_id_1,
-                contract: CIS_CONTRACT_ADDRESS,
-                price: token_price_1,
-                owner: ACCOUNT_0,
-                primary_owner: ACCOUNT_0,
-                quantity: token_quantity_1,
-                royalty: 0,
-            }
-        );
-
-        claim_eq!(
-            second_token,
-            &TokenListItem {
-                token_id: token_id_2,
-                contract: CIS_CONTRACT_ADDRESS,
-                price: token_price_2,
-                owner: ACCOUNT_0,
-                primary_owner: ACCOUNT_0,
-                quantity: token_quantity_1,
-                royalty: 0,
-            }
-        )
-    }
-
-    #[concordium_test]
-    fn calculate_commissions_test() {
-        let commission_percentage_basis: u16 = 250;
-        let royalty_percentage_basis: u16 = 1000;
-        let init_amount = Amount::from_ccd(11);
-        let distributable_amounts = calculate_amounts(
-            &init_amount,
-            &Commission {
-                percentage_basis: commission_percentage_basis,
-            },
-            royalty_percentage_basis,
-        );
-
-        claim_eq!(
-            distributable_amounts.to_seller,
-            Amount::from_micro_ccd(9625000)
-        );
-        claim_eq!(
-            distributable_amounts.to_marketplace,
-            Amount::from_micro_ccd(275000)
-        );
-        claim_eq!(
-            distributable_amounts.to_primary_owner,
-            Amount::from_micro_ccd(1100000)
-        );
-        claim_eq!(
-            init_amount,
-            Amount::from_ccd(0)
-                .add_micro_ccd(distributable_amounts.to_seller.micro_ccd())
-                .add_micro_ccd(distributable_amounts.to_marketplace.micro_ccd())
-                .add_micro_ccd(distributable_amounts.to_primary_owner.micro_ccd())
         )
     }
 }
